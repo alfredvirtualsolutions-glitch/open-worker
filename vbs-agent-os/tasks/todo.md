@@ -20,6 +20,15 @@ Scope: PRD §8 Phase 1 (Core Operations) only. Target: hiclaw-hermes-worker VPS 
 - [ ] User runs runbook on hiclaw-hermes-worker, supplies ANTHROPIC_API_KEY + admin token
 - [ ] Post-deploy smoke test against PRD §9 acceptance checklist (Phase-1-relevant items)
 
+## PRD alignment pass (against the full PRD document, not just ADR-001's summary)
+- [x] FR-10: retry limits configurable per task_type (was hardcoded 5 everywhere) — src/config/retryPolicy.ts
+- [x] PRD §3 canonical flow: Gemma → DeepSeek → Prime gate → Nova → Prime final QA chained as
+      linked follow-up tasks per pipelined task_type — src/config/workflowPipeline.ts
+- [ ] PRD §3 step 8 "Response Analysis - Nova": classifying an inbound reply requires an
+      ingestion path (something has to create the response-analysis task when a reply
+      arrives) — no such trigger exists yet; out of scope until there's an actual inbound
+      channel to wire it to.
+
 ## Notes / lessons
 - No SSH access from this session — deploy is runbook-based, by design (keeps owner's key off session).
 - LLM backend: Claude for all 5 roles (owner's choice) — role separation enforced via system prompts + DB constraints, not separate model vendors.

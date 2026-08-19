@@ -30,7 +30,16 @@ function rowToContract(row: Record<string, unknown>): TaskContract {
   });
 }
 
-export async function createTask(input: CreateTaskInput, opts?: { parentTaskId?: string; runId?: string }): Promise<TaskContract> {
+export async function createTask(
+  input: CreateTaskInput,
+  opts?: {
+    parentTaskId?: string;
+    runId?: string;
+    /** Seed evidence/result carried forward from a prior pipeline stage (PRD §3 canonical flow). */
+    initialEvidence?: unknown[];
+    initialResult?: Record<string, unknown>;
+  }
+): Promise<TaskContract> {
   const task_id = randomUUID();
   const run_id = opts?.runId ?? randomUUID();
   const assigned_agent: AgentName = input.assigned_agent ?? "hermes";
@@ -40,8 +49,8 @@ export async function createTask(input: CreateTaskInput, opts?: { parentTaskId?:
   const { rows } = await pool.query(
     `INSERT INTO tasks (
         task_id, run_id, parent_task_id, client_id, requested_by, assigned_agent,
-        task_type, priority, input, expected_output, status, max_attempts
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'QUEUED',$11)
+        task_type, priority, input, expected_output, status, max_attempts, evidence, result
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'QUEUED',$11,$12,$13)
      RETURNING *`,
     [
       task_id,
@@ -55,6 +64,8 @@ export async function createTask(input: CreateTaskInput, opts?: { parentTaskId?:
       JSON.stringify(input.input ?? {}),
       JSON.stringify(input.expected_output ?? {}),
       max_attempts,
+      JSON.stringify(opts?.initialEvidence ?? []),
+      JSON.stringify(opts?.initialResult ?? {}),
     ]
   );
 

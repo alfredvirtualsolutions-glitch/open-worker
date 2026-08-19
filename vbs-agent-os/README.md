@@ -6,6 +6,16 @@ Prime, Nova — all Claude-backed), state transitions, independent per-agent
 reporting, and the pause/cancel kill switches. See `ADR-001-vbs-agent-operating-system.md`
 for the full architecture rationale and `tasks/todo.md` for build status.
 
+The PRD's canonical end-to-end flow (§3) — Gemma research → DeepSeek
+extraction → Prime gate → Nova communication prep → Prime final QA →
+Hermes execute — is implemented as chained tasks: every single worker's
+output already goes through a Prime QA gate before closing, so a
+pipelined `task_type` (configured in `src/config/workflowPipeline.ts`)
+just has Hermes spawn the next stage as a linked follow-up task
+(`parent_task_id`/`run_id`) each time Prime approves, carrying the prior
+stage's evidence/result forward. A `task_type` absent from that config
+behaves as a single worker + one Prime gate, same as before.
+
 ## Local development
 
 ```bash
@@ -26,6 +36,8 @@ project, secrets, running `deploy/deploy.sh`, verifying).
 ## API surface (all routes require `Authorization: Bearer $HERMES_ADMIN_TOKEN`)
 
 - `POST /tasks` — create a task (FR-01). `assigned_agent` must be one of `gemma|deepseek|nova`.
+  If `task_type` is a pipelined type (see `src/config/workflowPipeline.ts`), `assigned_agent`
+  is overridden to the pipeline's first stage regardless of what's passed.
 - `GET /tasks` — list recent tasks.
 - `GET /tasks/:taskId` — full task + its audit trail (FR-09).
 - `POST /tasks/:taskId/resolve` — owner resolves a `HUMAN_REVIEW` task.

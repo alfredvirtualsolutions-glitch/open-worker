@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { createTaskInputSchema } from "../../contract/taskContract.js";
 import { createTask, getTask, getTaskEvents, listAllTasks, resolveHumanReview } from "../../db/taskRepo.js";
+import { getPipelineStartAgent } from "../../config/workflowPipeline.js";
 import { redactDeep } from "../../security/redact.js";
 import { requireAdminToken } from "../auth.js";
 
@@ -16,7 +17,10 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     if (!parsed.success) {
       return reply.code(400).send({ error: "invalid task payload", details: parsed.error.flatten() });
     }
-    const agent = parsed.data.assigned_agent ?? "gemma";
+    // PRD §3 canonical flow: a pipelined task_type always starts at its
+    // first stage, regardless of what assigned_agent the caller passed —
+    // the pipeline, not the caller, owns routing for these task_types.
+    const agent = getPipelineStartAgent(parsed.data.task_type) ?? parsed.data.assigned_agent ?? "gemma";
     if (!WORK_AGENTS.has(agent)) {
       return reply
         .code(400)

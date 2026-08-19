@@ -4,6 +4,7 @@ import { logger } from "../logging/logger.js";
 import {
   claimDispatchableTasks,
   claimQaPendingTasks,
+  createTask,
   transitionTask,
   scheduleRetry,
   escalateQaFailureIfExhausted,
@@ -19,6 +20,7 @@ import { novaAdapter } from "../agents/nova.js";
 import type { AgentAdapter, PrimeOutput } from "../agents/types.js";
 import type { AgentName, TaskContract } from "../contract/taskContract.js";
 import { assertAgentMayEmitDecision, PRIME_DECISION_TO_STATUS } from "../contract/stateMachine.js";
+import { getNextPipelineAgent } from "../config/workflowPipeline.js";
 
 const WORKER_ADAPTERS: Partial<Record<AgentName, AgentAdapter>> = {
   gemma: gemmaAdapter,
@@ -156,14 +158,45 @@ export class HermesDispatcher {
       if (primeOut.prime_decision === "REWORK") {
         await requeueForRework(task.task_id);
       } else if (primeOut.prime_decision === "APPROVED") {
-        // Phase 1: no autonomous external actions (PRD §8 Phase 5 gate). Close cleanly.
         const fresh = await getTask(task.task_id);
         if (fresh) {
-          await transitionTask(task.task_id, {
-            status: "CLOSED",
-            actor: "hermes",
-            detail: { note: "Approved; controlled actions are not enabled in this Phase 1 deployment." },
-          });
+          // PRD §3 canonical flow: Gemma -> DeepSeek -> Prime gate -> Nova ->
+          // Prime final QA -> Hermes execute. If this task_type is pipelined
+          // and this wasn't the last stage, hand off to the next agent as a
+          // linked follow-up task instead of closing.
+          const nextAgent = getNextPipelineAgent(fresh.task_type, fresh.assigned_agent);
+          if (nextAgent) {
+            await transitionTask(task.task_id, {
+              status: "CLOSED",
+              actor: "hermes",
+              detail: { note: `Approved; pipeline advancing to ${nextAgent}.` },
+            });
+            const nextTask = await createTask(
+              {
+                client_id: fresh.client_id,
+                requested_by: "hermes",
+                task_type: fresh.task_type,
+                priority: fresh.priority,
+                input: fresh.input,
+                expected_output: fresh.expected_output,
+                assigned_agent: nextAgent as "gemma" | "deepseek" | "nova",
+              },
+              {
+                parentTaskId: fresh.task_id,
+                runId: fresh.run_id,
+                initialEvidence: fresh.evidence,
+                initialResult: fresh.result,
+              }
+            );
+            log.info({ nextTaskId: nextTask.task_id, nextAgent }, "pipeline advanced to next stage");
+          } else {
+            // Last (or only) stage. Phase 1: no autonomous external actions (PRD §8 Phase 5 gate).
+            await transitionTask(task.task_id, {
+              status: "CLOSED",
+              actor: "hermes",
+              detail: { note: "Approved; controlled actions are not enabled in this Phase 1 deployment." },
+            });
+          }
         }
       } else if (primeOut.prime_decision === "REJECTED") {
         await transitionTask(task.task_id, { status: "CLOSED", actor: "hermes", detail: { note: "rejected by Prime" } });
