@@ -101,7 +101,9 @@ export class HermesDispatcher {
     const adapter = WORKER_ADAPTERS[task.assigned_agent];
     if (!adapter) {
       log.error("no worker adapter registered for assigned_agent");
-      await scheduleRetry(task.task_id, 1, `No worker adapter for ${task.assigned_agent}`);
+      // No retry could ever fix a missing adapter — override the task's configured
+      // max_attempts down to 1 so this fails immediately instead of backing off.
+      await scheduleRetry(task.task_id, `No worker adapter for ${task.assigned_agent}`, 1);
       return;
     }
 
@@ -124,7 +126,7 @@ export class HermesDispatcher {
       await transitionTask(task.task_id, { status: "QA_PENDING", actor: "hermes" });
     } catch (err) {
       log.error({ err: (err as Error).message }, "worker task failed");
-      await scheduleRetry(task.task_id, 5, (err as Error).message);
+      await scheduleRetry(task.task_id, (err as Error).message);
     }
   }
 
@@ -169,7 +171,7 @@ export class HermesDispatcher {
       // HUMAN_REVIEW: left as-is for the owner to resolve via POST /tasks/:id/resolve.
     } catch (err) {
       log.error({ err: (err as Error).message }, "Prime QA task failed");
-      await escalateQaFailureIfExhausted(task.task_id, 5, (err as Error).message);
+      await escalateQaFailureIfExhausted(task.task_id, (err as Error).message);
     }
   }
 }

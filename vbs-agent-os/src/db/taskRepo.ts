@@ -4,6 +4,7 @@ import { pool } from "./pool.js";
 import type { AgentName, CreateTaskInput, TaskContract, TaskStatus } from "../contract/taskContract.js";
 import { taskContractSchema } from "../contract/taskContract.js";
 import { assertLegalTransition } from "../contract/stateMachine.js";
+import { getMaxAttemptsForTaskType, DEFAULT_MAX_ATTEMPTS, DEFAULT_QA_MAX_ATTEMPTS } from "../config/retryPolicy.js";
 
 function rowToContract(row: Record<string, unknown>): TaskContract {
   return taskContractSchema.parse({
@@ -33,12 +34,14 @@ export async function createTask(input: CreateTaskInput, opts?: { parentTaskId?:
   const task_id = randomUUID();
   const run_id = opts?.runId ?? randomUUID();
   const assigned_agent: AgentName = input.assigned_agent ?? "hermes";
+  // PRD FR-10: retry limits are configurable per task type, not a global constant.
+  const max_attempts = getMaxAttemptsForTaskType(input.task_type);
 
   const { rows } = await pool.query(
     `INSERT INTO tasks (
         task_id, run_id, parent_task_id, client_id, requested_by, assigned_agent,
-        task_type, priority, input, expected_output, status
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'QUEUED')
+        task_type, priority, input, expected_output, status, max_attempts
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'QUEUED',$11)
      RETURNING *`,
     [
       task_id,
@@ -51,6 +54,7 @@ export async function createTask(input: CreateTaskInput, opts?: { parentTaskId?:
       input.priority ?? "normal",
       JSON.stringify(input.input ?? {}),
       JSON.stringify(input.expected_output ?? {}),
+      max_attempts,
     ]
   );
 
@@ -274,12 +278,17 @@ export async function resolveHumanReview(
  * assigned_agent and would incorrectly re-run the original worker instead of
  * retrying Prime's review.
  */
-export async function escalateQaFailureIfExhausted(taskId: string, maxAttempts: number, reason: string): Promise<void> {
+export async function escalateQaFailureIfExhausted(
+  taskId: string,
+  reason: string,
+  maxAttemptsOverride?: number
+): Promise<void> {
   const { rows } = await pool.query(
-    "UPDATE tasks SET attempt_count = attempt_count + 1, updated_at = now() WHERE task_id = $1 RETURNING attempt_count",
+    "UPDATE tasks SET attempt_count = attempt_count + 1, updated_at = now() WHERE task_id = $1 RETURNING attempt_count, max_attempts",
     [taskId]
   );
   const attempt = rows[0]?.attempt_count ?? 1;
+  const maxAttempts = maxAttemptsOverride ?? rows[0]?.max_attempts ?? DEFAULT_QA_MAX_ATTEMPTS;
   if (attempt >= maxAttempts) {
     await transitionTask(taskId, {
       status: "HUMAN_REVIEW",
@@ -292,10 +301,17 @@ export async function escalateQaFailureIfExhausted(taskId: string, maxAttempts: 
   }
 }
 
-/** Bounded exponential backoff retry, per PRD §7 Retry Policy. Reads/bumps attempt_count itself. */
-export async function scheduleRetry(taskId: string, maxAttempts: number, reason: string): Promise<TaskContract> {
-  const { rows } = await pool.query("SELECT attempt_count FROM tasks WHERE task_id = $1", [taskId]);
+/**
+ * Bounded exponential backoff retry, per PRD §7 Retry Policy. Reads/bumps
+ * attempt_count itself. The retry limit is the task's own `max_attempts`
+ * (set at creation from its task_type, per FR-10) unless the caller passes
+ * an explicit override — used for failures no retry could ever fix (e.g. no
+ * adapter registered for the assigned agent).
+ */
+export async function scheduleRetry(taskId: string, reason: string, maxAttemptsOverride?: number): Promise<TaskContract> {
+  const { rows } = await pool.query("SELECT attempt_count, max_attempts FROM tasks WHERE task_id = $1", [taskId]);
   const attempt = (rows[0]?.attempt_count ?? 0) + 1;
+  const maxAttempts = maxAttemptsOverride ?? rows[0]?.max_attempts ?? DEFAULT_MAX_ATTEMPTS;
   if (attempt >= maxAttempts) {
     const failed = await transitionTask(taskId, {
       status: "FAILED_FINAL",
