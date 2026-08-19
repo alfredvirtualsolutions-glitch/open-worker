@@ -32,16 +32,26 @@ that name instead here and set `DOMAIN=` to match in step 3.
 
 ## 2. Get the project onto the server
 
-From your own machine, in the folder where you unzipped the delivered
-`vbs-agent-os.tar.gz`:
+The code now lives in the `open-worker` GitHub repo (this file's own repo),
+under `vbs-agent-os/`. Clone it directly on the server rather than
+transferring a tarball:
 
 ```bash
-scp vbs-agent-os.tar.gz root@95.111.213.103:/root/
 ssh root@95.111.213.103
-mkdir -p /opt/vbs-agent-os
-tar -xzf /root/vbs-agent-os.tar.gz -C /opt/vbs-agent-os --strip-components=1
+git clone https://github.com/alfredvirtualsolutions-glitch/open-worker.git /opt/open-worker
+ln -s /opt/open-worker/vbs-agent-os /opt/vbs-agent-os
 cd /opt/vbs-agent-os
 ```
+
+(The symlink at `/opt/vbs-agent-os` just keeps the rest of this runbook's
+paths — and `deploy/vbs-agent-os.service`'s `WorkingDirectory` — unchanged
+regardless of where the parent `open-worker` clone lives.)
+
+If the repo is private, either clone over SSH with a deploy key added to the
+repo (`git clone git@github.com:alfredvirtualsolutions-glitch/open-worker.git /opt/open-worker`),
+or generate a fine-scoped GitHub personal access token and clone with
+`https://<token>@github.com/...` — either way, do this directly on the
+server; never paste a token into a chat session.
 
 ## 3. Configure secrets
 
@@ -118,8 +128,7 @@ curl -s -H "Authorization: Bearer TOKEN" https://ops.warmail.online/reports/exec
 - Logs: `docker compose logs -f app`
 - Restart: `systemctl restart vbs-agent-os` (or `docker compose restart`)
 - Pause everything: `curl -X POST .../control/pause-all -d '{"paused":true}'`
-- Update code: re-run `scp` + `tar` from step 2 with a new build, then
-  `docker compose build && docker compose up -d`
+- Update code: `cd /opt/open-worker && git pull && cd /opt/vbs-agent-os && docker compose build && docker compose up -d`
 
 ## What this does NOT do yet (by design)
 
