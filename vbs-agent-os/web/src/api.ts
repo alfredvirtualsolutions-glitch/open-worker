@@ -98,6 +98,40 @@ export interface PrimeReport {
   average_confidence: number | null;
 }
 
+export interface HermesReport {
+  agent: "hermes";
+  jobs_by_status: Record<string, number>;
+  tasks_retried: number;
+  blocked_dependencies: number;
+  system_health: "ok" | "attention";
+}
+
+export interface WorkerReport {
+  agent: string;
+  total_tasks: number;
+  by_status: Record<string, number>;
+  weak_evidence_count: number;
+  error_count: number;
+}
+
+export interface ExecutiveReport {
+  agent: "hermes_executive_summary";
+  note: string;
+  todays_task_volume: number;
+  attention_required: Array<{ task_id: string; task_type: string; assigned_agent: string; status: string; issues: unknown[] }>;
+  blockers: Array<{ task_id: string; task_type: string; status: string }>;
+  system_health: Array<{ status: string; count: number }>;
+}
+
+export interface ControlFlag {
+  scope: "ALL" | "CLIENT" | "WORKFLOW";
+  scope_key: string;
+  paused: boolean;
+  paused_by: string | null;
+  paused_at: string | null;
+  reason: string | null;
+}
+
 export type ResolveDecision = "APPROVED" | "REWORK" | "REJECTED" | "CLOSED";
 
 export const api = {
@@ -109,5 +143,22 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ decision, note: note.trim() || undefined }),
     }),
+  cancelTask: (taskId: string) => request<{ ok: true; task: Task }>(`/control/cancel-task/${taskId}`, { method: "POST" }),
   primeReport: () => request<PrimeReport>("/reports/prime"),
+  reportHermes: () => request<HermesReport>("/reports/hermes"),
+  reportWorker: (agent: "gemma" | "deepseek" | "nova") => request<WorkerReport>(`/reports/${agent}`),
+  reportExecutive: () => request<ExecutiveReport>("/reports/executive"),
+  controlFlags: () => request<ControlFlag[]>("/control/flags"),
+  pauseAll: (paused: boolean, reason?: string) =>
+    request<{ ok: true }>("/control/pause-all", { method: "POST", body: JSON.stringify({ paused, reason }) }),
+  pauseClient: (clientId: string, paused: boolean, reason?: string) =>
+    request<{ ok: true }>("/control/pause-client", {
+      method: "POST",
+      body: JSON.stringify({ client_id: clientId, paused, reason }),
+    }),
+  pauseWorkflow: (runId: string, paused: boolean, reason?: string) =>
+    request<{ ok: true }>("/control/pause-workflow", {
+      method: "POST",
+      body: JSON.stringify({ run_id: runId, paused, reason }),
+    }),
 };

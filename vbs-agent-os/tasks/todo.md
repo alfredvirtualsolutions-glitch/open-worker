@@ -44,6 +44,19 @@ Scope: PRD §8 Phase 1 (Core Operations) only. Target: hiclaw-hermes-worker VPS 
       and /gate/assets/* serve correctly and unauthenticated API calls still 401
 - [ ] Owner tries it against a real deployment and gives feedback
 
+## Phase 3 — Command Center (ADR-002 addendum)
+- [x] Second tab in the same web/ app (CommandCenter.tsx) — no backend changes needed,
+      every endpoint it uses already existed from Phase 1
+- [x] Executive summary, five agent cards (Hermes/Gemma/DeepSeek/Prime/Nova), PAUSE_ALL
+      toggle. PAUSE_CLIENT/PAUSE_WORKFLOW stay API-only (see ADR-002 addendum for why);
+      CANCEL_TASK added to TaskDetail instead (per-task action, not a dashboard control)
+- [x] Real end-to-end smoke test: started a local Postgres, applied the schema, seeded
+      tasks across HUMAN_REVIEW/CLOSED/FAILED_FINAL, ran the actual backend against it,
+      exercised create/resolve/pause/flags over curl, then screenshotted the running UI
+      (Playwright + the sandbox's pre-installed Chromium) to confirm it renders and
+      behaves correctly against real data — not just a build-succeeds check
+- [ ] Owner tries it against a real deployment and gives feedback
+
 ## Notes / lessons
 - No SSH access from this session — deploy is runbook-based, by design (keeps owner's key off session).
 - LLM backend: Claude for all 5 roles (owner's choice) — role separation enforced via system prompts + DB constraints, not separate model vendors.

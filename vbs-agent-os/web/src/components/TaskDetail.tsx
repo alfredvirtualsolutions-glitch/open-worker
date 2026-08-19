@@ -3,6 +3,7 @@ import { api, ApiError, type Task, type TaskEvent, type ResolveDecision } from "
 import { StatusBadge } from "./Badges";
 
 const DECISIONS: ResolveDecision[] = ["APPROVED", "REWORK", "REJECTED", "CLOSED"];
+const TERMINAL_STATUSES = new Set(["CLOSED", "REJECTED", "FAILED_FINAL"]);
 
 export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => void }) {
   const [task, setTask] = useState<Task | null>(null);
@@ -12,6 +13,7 @@ export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => v
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [resolved, setResolved] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -43,6 +45,19 @@ export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => v
     }
   }
 
+  async function handleCancel() {
+    setCancelling(true);
+    setError(null);
+    try {
+      await api.cancelTask(taskId);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to cancel task.");
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   if (error && !task) {
     return (
       <div className="detail-page">
@@ -64,6 +79,11 @@ export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => v
       <header className="detail-header">
         <h2>{task.task_type}</h2>
         <StatusBadge status={task.status} />
+        {!TERMINAL_STATUSES.has(task.status) && (
+          <button className="cancel-button" onClick={() => void handleCancel()} disabled={cancelling}>
+            {cancelling ? "Cancelling…" : "Cancel task"}
+          </button>
+        )}
       </header>
 
       <dl className="detail-meta">

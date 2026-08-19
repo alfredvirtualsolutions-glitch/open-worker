@@ -70,3 +70,19 @@ no SEO/routing requirements — a framework built for those problems is pure ove
   single-owner tool, called out here so it isn't a silent assumption later.
 - **Revisit:** before Phase 3, decide whether kill-switch controls join this same app or
   get their own view within it.
+
+## Addendum: Phase 3 (2026-08-19)
+
+Resolved the open question above: Phase 3's command center is a second tab in the same
+`web/` app (`CommandCenter.tsx`), not a new project — confirming the "Easier" consequence
+predicted it correctly. Genuinely required no backend changes; every endpoint it calls
+(`GET /reports/{hermes,gemma,deepseek,prime,nova,executive}`, `GET /control/flags`,
+`POST /control/pause-all`) already existed from Phase 1.
+
+Scope decision on kill switches specifically: only `PAUSE_ALL` got a control (a single
+toggle — the one switch an owner needs in an emergency, not a form). `PAUSE_CLIENT` and
+`PAUSE_WORKFLOW` need a `client_id`/`run_id` the dashboard doesn't otherwise surface
+prominently, so building input forms for them now would be speculative; they stay
+API-only until there's an actual workflow that makes their targets visible in the UI.
+`CANCEL_TASK` went to `TaskDetail` instead of the command center — it acts on one task,
+so it belongs where that task is already open, not on a global dashboard.
