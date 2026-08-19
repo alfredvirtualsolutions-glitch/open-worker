@@ -25,6 +25,15 @@ export const WORKFLOW_PIPELINES: Record<string, AgentName[]> = {
   research_to_outreach: ["gemma", "deepseek", "nova"],
 };
 
+/**
+ * PRD §3 step 8 "Response Analysis - Nova": the task_type used for tasks
+ * created from an inbound reply (POST /webhooks/inbound-reply). Nova's
+ * FR-06 "no unapproved context" guard (src/agents/nova.ts) is exempted for
+ * this task_type — analyzing a reply needs no prior approved evidence, it
+ * works from the fresh inbound text instead, so there's nothing to invent.
+ */
+export const RESPONSE_ANALYSIS_TASK_TYPE = "response_analysis";
+
 export function getPipeline(taskType: string): AgentName[] | null {
   return WORKFLOW_PIPELINES[taskType] ?? null;
 }

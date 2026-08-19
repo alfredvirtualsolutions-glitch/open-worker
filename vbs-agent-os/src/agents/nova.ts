@@ -3,13 +3,17 @@ import { NOVA_SYSTEM_PROMPT } from "./prompts.js";
 import { agentOutputSchema, type AgentAdapter, type AgentOutput } from "./types.js";
 import { runAgentCall } from "./runAgentCall.js";
 import type { TaskContract } from "../contract/taskContract.js";
+import { RESPONSE_ANALYSIS_TASK_TYPE } from "../config/workflowPipeline.js";
 
 export const novaAdapter: AgentAdapter = {
   name: "nova",
   async run(task: TaskContract): Promise<AgentOutput> {
-    if (task.evidence.length === 0 && Object.keys(task.result).length === 0) {
+    const isResponseAnalysis = task.task_type === RESPONSE_ANALYSIS_TASK_TYPE;
+    if (!isResponseAnalysis && task.evidence.length === 0 && Object.keys(task.result).length === 0) {
       // FR-06 enforced structurally, not just by prompt: refuse to even call the
-      // model if there is nothing approved to draft from.
+      // model if there is nothing approved to draft from. Doesn't apply to
+      // response-analysis tasks (PRD §3 step 8) — those analyze fresh inbound
+      // reply text, not draft outbound communication, so there's nothing to invent.
       return {
         result: {},
         evidence: [],

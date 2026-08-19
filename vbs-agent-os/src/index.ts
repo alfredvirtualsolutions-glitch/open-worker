@@ -5,6 +5,7 @@ import { logger } from "./logging/logger.js";
 import { taskRoutes } from "./api/routes/tasks.js";
 import { reportRoutes } from "./api/routes/reports.js";
 import { controlRoutes } from "./api/routes/control.js";
+import { webhookRoutes } from "./api/routes/webhooks.js";
 import { HermesDispatcher } from "./hermes/dispatcher.js";
 import { pool } from "./db/pool.js";
 
@@ -25,6 +26,7 @@ async function main() {
   await app.register(taskRoutes);
   await app.register(reportRoutes);
   await app.register(controlRoutes);
+  await app.register(webhookRoutes);
 
   const dispatcher = new HermesDispatcher();
   dispatcher.start();

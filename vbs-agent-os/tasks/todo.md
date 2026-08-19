@@ -24,10 +24,12 @@ Scope: PRD §8 Phase 1 (Core Operations) only. Target: hiclaw-hermes-worker VPS 
 - [x] FR-10: retry limits configurable per task_type (was hardcoded 5 everywhere) — src/config/retryPolicy.ts
 - [x] PRD §3 canonical flow: Gemma → DeepSeek → Prime gate → Nova → Prime final QA chained as
       linked follow-up tasks per pipelined task_type — src/config/workflowPipeline.ts
-- [ ] PRD §3 step 8 "Response Analysis - Nova": classifying an inbound reply requires an
-      ingestion path (something has to create the response-analysis task when a reply
-      arrives) — no such trigger exists yet; out of scope until there's an actual inbound
-      channel to wire it to.
+- [x] PRD §3 step 8 "Response Analysis - Nova": POST /webhooks/inbound-reply turns an
+      inbound reply into a Nova response_analysis task (channel-agnostic — a real
+      provider still needs to be wired up to call it; see README "Wiring a real inbound
+      channel"). Also fixed Nova's FR-06 "no approved context" guard, which was
+      incorrectly blocking response-analysis tasks (they legitimately start with empty
+      evidence — they analyze fresh inbound text, not draft from prior approved context).
 
 ## Notes / lessons
 - No SSH access from this session — deploy is runbook-based, by design (keeps owner's key off session).

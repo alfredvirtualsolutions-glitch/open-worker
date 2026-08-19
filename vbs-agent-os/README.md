@@ -45,7 +45,20 @@ project, secrets, running `deploy/deploy.sh`, verifying).
 - `GET /reports/executive` — Hermes's consolidated view (additive, per FR-08).
 - `GET /control/flags`, `POST /control/pause-all`, `POST /control/pause-client`,
   `POST /control/pause-workflow`, `POST /control/cancel-task/:taskId` — kill switches (PRD §7).
+- `POST /webhooks/inbound-reply` — turns an inbound reply (email/SMS/chat/etc.) into a
+  Nova `response_analysis` task (PRD §3 step 8). Body: `{client_id, channel, from,
+  reply_text, in_reply_to_task_id?, received_at?}`. See "Wiring a real inbound channel" below.
 - `GET /healthz` — unauthenticated liveness/DB check.
+
+### Wiring a real inbound channel
+
+`POST /webhooks/inbound-reply` is the trigger PRD §3 step 8 needs, but it's
+channel-agnostic by design — nothing here calls out to an email or SMS
+provider yet. To wire up a real one: point that provider's inbound webhook
+(e.g. Postmark/SendGrid inbound parse, Twilio SMS) at a small translator
+that maps its payload to this endpoint's shape, and add that provider's own
+webhook-signature verification in front of it rather than relying on the
+shared `HERMES_ADMIN_TOKEN` for an externally-reachable endpoint.
 
 ## What's intentionally not built yet
 
