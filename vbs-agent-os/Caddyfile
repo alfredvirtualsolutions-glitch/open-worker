@@ -1,0 +1,17 @@
+{$DOMAIN:ops.warmail.online} {
+	encode gzip
+
+	reverse_proxy app:8787
+
+	# The admin API is bearer-token protected (HERMES_ADMIN_TOKEN) at the app
+	# layer already; TLS is handled automatically here via Let's Encrypt.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+	}
+
+	log {
+		output file /data/access.log
+	}
+}
