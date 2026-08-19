@@ -86,8 +86,10 @@ export async function listTasksByAgent(agent: AgentName, limit = 100): Promise<T
   return rows.map(rowToContract);
 }
 
-export async function listAllTasks(limit = 200): Promise<TaskContract[]> {
-  const { rows } = await pool.query("SELECT * FROM tasks ORDER BY created_at DESC LIMIT $1", [limit]);
+export async function listAllTasks(limit = 200, status?: TaskStatus): Promise<TaskContract[]> {
+  const { rows } = status
+    ? await pool.query("SELECT * FROM tasks WHERE status = $1 ORDER BY created_at DESC LIMIT $2", [status, limit])
+    : await pool.query("SELECT * FROM tasks ORDER BY created_at DESC LIMIT $1", [limit]);
   return rows.map(rowToContract);
 }
 

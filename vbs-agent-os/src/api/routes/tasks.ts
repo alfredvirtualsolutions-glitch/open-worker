@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { createTaskInputSchema } from "../../contract/taskContract.js";
+import { createTaskInputSchema, TASK_STATUSES } from "../../contract/taskContract.js";
 import { createTask, getTask, getTaskEvents, listAllTasks, resolveHumanReview } from "../../db/taskRepo.js";
 import { getPipelineStartAgent } from "../../config/workflowPipeline.js";
 import { redactDeep } from "../../security/redact.js";
@@ -31,8 +31,13 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get("/tasks", async (request, reply) => {
-    const query = z.object({ limit: z.coerce.number().int().positive().max(1000).default(200) }).parse(request.query);
-    const tasks = await listAllTasks(query.limit);
+    const query = z
+      .object({
+        limit: z.coerce.number().int().positive().max(1000).default(200),
+        status: z.enum(TASK_STATUSES).optional(),
+      })
+      .parse(request.query);
+    const tasks = await listAllTasks(query.limit, query.status);
     return reply.send(redactDeep(tasks));
   });
 

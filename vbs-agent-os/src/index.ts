@@ -1,5 +1,9 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import fastifyStatic from "@fastify/static";
 import { env } from "./config/env.js";
 import { logger } from "./logging/logger.js";
 import { taskRoutes } from "./api/routes/tasks.js";
@@ -8,6 +12,11 @@ import { controlRoutes } from "./api/routes/control.js";
 import { webhookRoutes } from "./api/routes/webhooks.js";
 import { HermesDispatcher } from "./hermes/dispatcher.js";
 import { pool } from "./db/pool.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Built by the `web/` Vite app (see ADR-002); copied into place at
+// ./web-dist by the Docker build's web-build stage in production.
+const WEB_DIST = path.join(__dirname, "../web-dist");
 
 async function main() {
   const app = Fastify({ loggerInstance: logger as any });
@@ -27,6 +36,15 @@ async function main() {
   await app.register(reportRoutes);
   await app.register(controlRoutes);
   await app.register(webhookRoutes);
+
+  // Prime Control Gate UI (ADR-002) — static SPA served from the same
+  // process/container, no separate service. Skipped with a warning if the
+  // web app hasn't been built yet (e.g. local backend-only dev).
+  if (existsSync(WEB_DIST)) {
+    await app.register(fastifyStatic, { root: WEB_DIST, prefix: "/gate/" });
+  } else {
+    logger.warn({ WEB_DIST }, "web-dist not found — /gate UI not served (run `npm run build` in web/ first)");
+  }
 
   const dispatcher = new HermesDispatcher();
   dispatcher.start();

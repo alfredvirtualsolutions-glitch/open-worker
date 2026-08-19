@@ -3,8 +3,10 @@
 Implements the PRD's Phase 1 scope: the shared task contract, persistent
 state, Hermes routing, the four specialist agent adapters (Gemma, DeepSeek,
 Prime, Nova — all Claude-backed), state transitions, independent per-agent
-reporting, and the pause/cancel kill switches. See `ADR-001-vbs-agent-operating-system.md`
-for the full architecture rationale and `tasks/todo.md` for build status.
+reporting, and the pause/cancel kill switches, plus the Phase 2 Prime Control
+Gate UI. See `ADR-001-vbs-agent-operating-system.md` (Phase 1) and
+`ADR-002-prime-control-gate-ui.md` (Phase 2) for the architecture rationale,
+and `tasks/todo.md` for build status.
 
 The PRD's canonical end-to-end flow (§3) — Gemma research → DeepSeek
 extraction → Prime gate → Nova communication prep → Prime final QA →
@@ -27,6 +29,22 @@ npm run dev             # or: npm start (after build)
 npm test                # vitest — state machine + task contract + redaction
 npm run typecheck
 ```
+
+### Prime Control Gate UI (`web/`)
+
+The human-review queue + task detail UI (ADR-002) is a separate small app.
+For UI development, run it standalone against the backend above:
+
+```bash
+cd web
+npm install
+npm run dev             # http://localhost:5173, proxies API calls to :8787
+```
+
+To see it served the way production does (same origin, at `/gate`, no
+proxy): `cd web && npm run build`, then `cp -r web/dist web-dist` from the
+repo root and restart the backend — `docker compose`/`deploy.sh` do this
+build step automatically via the Dockerfile's `web-build` stage.
 
 ## Deploying to hiclaw-hermes-worker
 
@@ -62,7 +80,8 @@ shared `HERMES_ADMIN_TOKEN` for an externally-reachable endpoint.
 
 ## What's intentionally not built yet
 
-Phase 2 (Prime control-gate UI), Phase 3 (5-agent command-center dashboard),
-Phase 5 (autonomous external actions), and Phase 6 (per-client campaign
-config beyond the basic `client_configs` table) are out of scope for this
-delivery — see the ADR's "Consequences" section for the upgrade path.
+Phase 3 (5-agent command-center dashboard, including the `PAUSE_*`/`CANCEL_TASK`
+kill-switch UI — the API for those already exists per PRD §7, just no UI yet),
+Phase 5 (autonomous external actions), and Phase 6 (per-client campaign config
+beyond the basic `client_configs` table) are out of scope for this delivery —
+see ADR-001's "Consequences" section and ADR-002 for the upgrade path.

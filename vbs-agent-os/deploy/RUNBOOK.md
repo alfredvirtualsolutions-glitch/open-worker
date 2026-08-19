@@ -117,6 +117,10 @@ Then watch it move through the pipeline:
 curl -s -H "Authorization: Bearer TOKEN" https://ops.warmail.online/reports/executive
 ```
 
+Open the Prime Control Gate UI at `https://ops.warmail.online/gate` and paste
+your `HERMES_ADMIN_TOKEN` when prompted — this is where you'll see and
+resolve `HUMAN_REVIEW` tasks day to day instead of using curl.
+
 > Note: `client_id` must exist in `client_configs` first (foreign key). For a
 > quick manual test, insert one directly against the managed database
 > (requires the `psql` client — `apt install -y postgresql-client` if it's
@@ -136,5 +140,7 @@ Per the PRD's release gate, Phase 5 (autonomous external actions — e.g. Nova
 actually sending emails, DeepSeek writing to external systems) is not wired
 up. Approved tasks close cleanly with a note that controlled actions aren't
 enabled. Enable that only after the Phase 1 acceptance checklist (PRD §9)
-has been exercised in production and you're ready to scope Phase 2/3
-(Prime control-gate UI + the 5-agent command center dashboard).
+has been exercised in production. The Phase 3 5-agent command-center
+dashboard (including the `PAUSE_*`/`CANCEL_TASK` kill-switch UI) also isn't
+built yet — those controls are curl-only for now (see step 6 above), though
+the Phase 2 Prime Control Gate UI at `/gate` is.

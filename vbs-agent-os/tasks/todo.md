@@ -31,6 +31,19 @@ Scope: PRD §8 Phase 1 (Core Operations) only. Target: hiclaw-hermes-worker VPS 
       incorrectly blocking response-analysis tasks (they legitimately start with empty
       evidence — they analyze fresh inbound text, not draft from prior approved context).
 
+## Phase 2 — Prime Control Gate UI (ADR-002)
+- [x] ADR-002: framework (Vite+React+TS SPA, no router), auth (paste admin token,
+      same bearer-token model), hosting (same container, served at /gate)
+- [x] Backend: GET /tasks accepts ?status= filter (needed for the human-review queue)
+- [x] web/: human-review queue, recent-activity list, Prime decision/confidence stats
+      (GET /reports/prime), task detail (evidence/input/result/audit trail), resolve
+      form (POST /tasks/:id/resolve)
+- [x] Dockerfile web-build stage; Fastify serves web-dist/ at /gate (skipped with a
+      warning if not built — local backend-only dev still works)
+- [x] Smoke-tested end to end: built the SPA, started the backend, confirmed /gate/
+      and /gate/assets/* serve correctly and unauthenticated API calls still 401
+- [ ] Owner tries it against a real deployment and gives feedback
+
 ## Notes / lessons
 - No SSH access from this session — deploy is runbook-based, by design (keeps owner's key off session).
 - LLM backend: Claude for all 5 roles (owner's choice) — role separation enforced via system prompts + DB constraints, not separate model vendors.
