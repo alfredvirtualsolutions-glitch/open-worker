@@ -1,0 +1,48 @@
+name: vbs-agent-os
+
+# Uses an external managed Postgres (UpCloud Managed Database) rather than a
+# local Postgres container — set DATABASE_URL in .env to the managed
+# instance's connection string (including ?sslmode=require).
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 8787
+      DATABASE_URL: ${DATABASE_URL}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      HERMES_ADMIN_TOKEN: ${HERMES_ADMIN_TOKEN}
+      DISPATCH_INTERVAL_MS: ${DISPATCH_INTERVAL_MS:-3000}
+      DISPATCH_CONCURRENCY: ${DISPATCH_CONCURRENCY:-3}
+      MODEL_HERMES: ${MODEL_HERMES:-claude-sonnet-4-5}
+      MODEL_GEMMA: ${MODEL_GEMMA:-claude-sonnet-4-5}
+      MODEL_DEEPSEEK: ${MODEL_DEEPSEEK:-claude-sonnet-4-5}
+      MODEL_PRIME: ${MODEL_PRIME:-claude-sonnet-4-5}
+      MODEL_NOVA: ${MODEL_NOVA:-claude-sonnet-4-5}
+    networks: [internal]
+    # No published ports — only Caddy talks to app.
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [app]
+    networks: [internal]
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
