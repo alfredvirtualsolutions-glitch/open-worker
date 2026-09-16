@@ -1,19 +1,48 @@
 import { env } from "../config/env.js";
 import { logger } from "../logging/logger.js";
-import type Sequenzy from "sequenzy";
 
-let sequenzyClient: Sequenzy | null = null;
+const SEQUENZY_API_BASE = "https://api.sequenzy.com/api/v1";
 
-export function getSequenzyClient(): Sequenzy | null {
+interface SequenzyClient {
+  apiKey: string;
+}
+
+let client: SequenzyClient | null = null;
+
+function getClient(): SequenzyClient | null {
   if (!env.SEQUENZY_API_KEY) {
     logger.warn("SEQUENZY_API_KEY not set — Sequenzy integration disabled");
     return null;
   }
-  if (!sequenzyClient) {
-    const { default: Sequenzy } = await import("sequenzy");
-    sequenzyClient = new Sequenzy({ apiKey: env.SEQUENZY_API_KEY });
+  if (!client) {
+    client = { apiKey: env.SEQUENZY_API_KEY };
   }
-  return sequenzyClient;
+  return client;
+}
+
+async function request<T>(
+  method: string,
+  path: string,
+  body?: Record<string, unknown>
+): Promise<T> {
+  const c = getClient();
+  if (!c) throw new Error("Sequenzy not configured");
+
+  const response = await fetch(`${SEQUENZY_API_BASE}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${c.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    const error = (data as { error?: string }).error || `HTTP ${response.status}`;
+    throw new Error(error);
+  }
+  return data as T;
 }
 
 export interface SendTransactionalEmailParams {
@@ -46,12 +75,9 @@ export async function sendTransactionalEmail(params: SendTransactionalEmailParam
   data?: unknown;
   error?: string;
 }> {
-  const client = getSequenzyClient();
-  if (!client) return { success: false, error: "Sequenzy not configured" };
-
   try {
-    const result = await client.transactional.send(params);
-    return { success: true, data: result };
+    const data = await request("POST", "/transactional/send", params as unknown as Record<string, unknown>);
+    return { success: true, data };
   } catch (err) {
     logger.error({ err, params }, "Sequenzy transactional send failed");
     return { success: false, error: (err as Error).message };
@@ -63,12 +89,9 @@ export async function createSubscriber(params: CreateSubscriberParams): Promise<
   data?: unknown;
   error?: string;
 }> {
-  const client = getSequenzyClient();
-  if (!client) return { success: false, error: "Sequenzy not configured" };
-
   try {
-    const result = await client.subscribers.create(params);
-    return { success: true, data: result };
+    const data = await request("POST", "/subscribers", params as unknown as Record<string, unknown>);
+    return { success: true, data };
   } catch (err) {
     logger.error({ err, params }, "Sequenzy create subscriber failed");
     return { success: false, error: (err as Error).message };
@@ -80,12 +103,9 @@ export async function addTag(params: AddTagParams): Promise<{
   data?: unknown;
   error?: string;
 }> {
-  const client = getSequenzyClient();
-  if (!client) return { success: false, error: "Sequenzy not configured" };
-
   try {
-    const result = await client.subscribers.tags.add(params);
-    return { success: true, data: result };
+    const data = await request("POST", "/subscribers/tags", params as unknown as Record<string, unknown>);
+    return { success: true, data };
   } catch (err) {
     logger.error({ err, params }, "Sequenzy add tag failed");
     return { success: false, error: (err as Error).message };
@@ -97,12 +117,9 @@ export async function triggerEvent(params: TriggerEventParams): Promise<{
   data?: unknown;
   error?: string;
 }> {
-  const client = getSequenzyClient();
-  if (!client) return { success: false, error: "Sequenzy not configured" };
-
   try {
-    const result = await client.subscribers.events.trigger(params);
-    return { success: true, data: result };
+    const data = await request("POST", "/subscribers/events", params as unknown as Record<string, unknown>);
+    return { success: true, data };
   } catch (err) {
     logger.error({ err, params }, "Sequenzy trigger event failed");
     return { success: false, error: (err as Error).message };
@@ -114,12 +131,9 @@ export async function getSubscriber(email: string): Promise<{
   data?: unknown;
   error?: string;
 }> {
-  const client = getSequenzyClient();
-  if (!client) return { success: false, error: "Sequenzy not configured" };
-
   try {
-    const result = await client.subscribers.get(email);
-    return { success: true, data: result };
+    const data = await request("GET", `/subscribers/${encodeURIComponent(email)}`);
+    return { success: true, data };
   } catch (err) {
     logger.error({ err, email }, "Sequenzy get subscriber failed");
     return { success: false, error: (err as Error).message };
@@ -131,12 +145,9 @@ export async function listSequences(): Promise<{
   data?: unknown;
   error?: string;
 }> {
-  const client = getSequenzyClient();
-  if (!client) return { success: false, error: "Sequenzy not configured" };
-
   try {
-    const result = await client.sequences.list();
-    return { success: true, data: result };
+    const data = await request("GET", "/sequences");
+    return { success: true, data };
   } catch (err) {
     logger.error({ err }, "Sequenzy list sequences failed");
     return { success: false, error: (err as Error).message };

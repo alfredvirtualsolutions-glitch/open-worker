@@ -6,13 +6,14 @@
   - Node.js 20 + TypeScript, Fastify API, PostgreSQL (managed), Docker Compose deploy
   - Five agent roles: Hermes (orchestrator), Gemma (research), DeepSeek (extraction), Prime (QA gate), Nova (comms) — all Claude-backed
   - `web/` — Prime Control Gate UI (React + Vite), built separately, served as static files at `/gate`
+  - `src/services/` — External service integrations (Sequenzy, bunny.net)
 
 ## Key commands (run from `vbs-agent-os/`)
 
 ### Local development
 ```bash
 npm install
-cp .env.example .env   # fill in ANTHROPIC_API_KEY, DATABASE_URL, HERMES_ADMIN_TOKEN
+cp .env.example .env   # fill in ANTHROPIC_API_KEY, DATABASE_URL, HERMES_ADMIN_TOKEN, SEQUENZY_API_KEY, BUNNY_API_KEY
 npm run build          # tsc + copies schema.sql to dist/db/
 npm run migrate        # runs schema.sql against managed Postgres
 npm run dev            # tsx watch src/index.ts (port 8787)
@@ -45,12 +46,16 @@ chmod +x deploy/deploy.sh
 | Var | Purpose |
 |-----|---------|
 | `DOMAIN` | Custom domain for Caddy (must have A record pointing at VPS) |
-| `DATABASE_URL` | Managed Postgres connection string with `sslmode=require` |
+| `DATABASE_URL` | Managed Postgres connection string with `?sslmode=require` |
 | `ANTHROPIC_API_KEY` | Single key for all 5 agent roles (`sk-ant-...`) |
 | `HERMES_ADMIN_TOKEN` | Bearer token for all API calls (`openssl rand -hex 32`) |
 | `DISPATCH_INTERVAL_MS` | Hermes poll interval (default 3000) |
 | `DISPATCH_CONCURRENCY` | Max concurrent tasks (default 3) |
 | `MODEL_*` | Per-role model override (default `claude-sonnet-4-5`) |
+| `SEQUENZY_API_KEY` | Email marketing API key (Nova: transactional sends, subscribers, events) |
+| `BUNNY_API_KEY` | CDN/storage/video API key (DeepSeek: uploads, purges, video push) |
+| `BUNNY_STORAGE_ZONE` | bunny.net storage zone name (for file uploads) |
+| `BUNNY_CDN_HOSTNAME` | bunny.net CDN hostname (for cache purges) |
 
 ## Architecture highlights
 - **Task contract** — Zod schema + Postgres `tasks` table; state machine enforced in DB (CHECK constraints + `task_events` audit log)
@@ -60,6 +65,12 @@ chmod +x deploy/deploy.sh
 - **Pipelined workflows** — configured in `src/config/workflowPipeline.ts`; `task_type` in pipeline auto-overrides `assigned_agent` to first stage
 - **Kill switches** — `PAUSE_ALL`, `PAUSE_CLIENT`, `PAUSE_WORKFLOW` in `control_flags` table (checked before every claim); `CANCEL_TASK` via status transition
 - **Secrets** — never logged, never in payloads/reports; redaction guard in logger + lint rule
+
+## External service integrations (Phase 5 slice)
+- **Sequenzy** (`src/services/sequenzy.ts`) — Nova handles: `sequenzy_send_email`, `sequenzy_trigger_event`, `sequenzy_manage_subscriber`. Calls `https://api.sequenzy.com/api/v1` with Bearer token.
+- **bunny.net** (`src/services/bunny.ts`) — DeepSeek handles: `bunny_upload`, `bunny_purge`, `bunny_video_push`. Calls `https://api.bunny.net` and `https://storage.bunnycdn.com` with `Access-Key` header.
+- Both are **opt-in**: if the API key env var is missing, the adapter returns a structured error instead of crashing.
+- Pipelined workflows: `email_outreach` (gemma→deepseek→nova), `content_publish` (gemma→deepseek→nova).
 
 ## API surface (all require `Authorization: Bearer $HERMES_ADMIN_TOKEN`)
 - `POST /tasks` — create task (`assigned_agent`: gemma|deepseek|nova; overridden for pipelined types)
@@ -78,12 +89,13 @@ chmod +x deploy/deploy.sh
 
 ## What's NOT built yet (by design)
 - Phase 3: 5-agent command-center dashboard (kill-switch UI)
-- Phase 5: Autonomous external actions (Nova sending emails, DeepSeek writing to external systems)
 - Phase 6: Per-client campaign config beyond basic `client_configs` table
 
 ## Key files to know
 - `ADR-001-vbs-agent-operating-system.md` — Phase 1 architecture rationale
 - `ADR-002-prime-control-gate-ui.md` — Phase 2 UI rationale
-- `src/config/workflowPipeline.ts` — pipelined task_type definitions
+- `src/config/workflowPipeline.ts` — pipelined task_type definitions + external action task types
 - `src/contract/stateMachine.ts` — state transition guards
+- `src/services/sequenzy.ts` — Sequenzy REST API wrapper (Nova)
+- `src/services/bunny.ts` — bunny.net REST API wrapper (DeepSeek)
 - `deploy/RUNBOOK.md` — full deploy procedure (DNS, secrets, verification)
