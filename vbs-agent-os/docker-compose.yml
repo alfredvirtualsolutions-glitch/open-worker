@@ -21,6 +21,10 @@ services:
       MODEL_DEEPSEEK: ${MODEL_DEEPSEEK:-claude-sonnet-4-5}
       MODEL_PRIME: ${MODEL_PRIME:-claude-sonnet-4-5}
       MODEL_NOVA: ${MODEL_NOVA:-claude-sonnet-4-5}
+      SEQUENZY_API_KEY: ${SEQUENZY_API_KEY:-}
+      BUNNY_API_KEY: ${BUNNY_API_KEY:-}
+      BUNNY_STORAGE_ZONE: ${BUNNY_STORAGE_ZONE:-}
+      BUNNY_CDN_HOSTNAME: ${BUNNY_CDN_HOSTNAME:-}
     networks: [internal]
     # No published ports — only Caddy talks to app.
 

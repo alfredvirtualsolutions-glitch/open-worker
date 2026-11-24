@@ -21,6 +21,11 @@ const envSchema = z.object({
   MODEL_DEEPSEEK: z.string().default("claude-sonnet-4-5"),
   MODEL_PRIME: z.string().default("claude-sonnet-4-5"),
   MODEL_NOVA: z.string().default("claude-sonnet-4-5"),
+  // --- External service integrations ---
+  SEQUENZY_API_KEY: z.string().optional(),
+  BUNNY_API_KEY: z.string().optional(),
+  BUNNY_STORAGE_ZONE: z.string().optional(),
+  BUNNY_CDN_HOSTNAME: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

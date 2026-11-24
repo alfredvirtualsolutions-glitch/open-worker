@@ -142,13 +142,24 @@ export async function claimDispatchableTasks(workerId: string, limit: number): P
     const claimed: TaskContract[] = [];
     for (const row of rows) {
       const from = row.status as TaskStatus;
-      assertLegalTransition(from, "ASSIGNED");
+      // FAILED_RETRYABLE can only re-enter the queue (FAILED_RETRYABLE -> QUEUED),
+      // never jump straight to ASSIGNED — PRD §4 state machine. Step through QUEUED
+      // first so the audit trail shows the legal path.
+      if (from === "FAILED_RETRYABLE") {
+        await client.query(
+          `UPDATE tasks SET status = 'QUEUED', locked_by = NULL, locked_at = NULL, updated_at = now()
+            WHERE task_id = $1`,
+          [row.task_id]
+        );
+        await logEvent(row.task_id, "hermes", "STATE_CHANGE", "FAILED_RETRYABLE", "QUEUED", { worker: workerId }, client);
+      }
+      assertLegalTransition("QUEUED", "ASSIGNED");
       await client.query(
         `UPDATE tasks SET status = 'ASSIGNED', locked_by = $2, locked_at = now(), updated_at = now()
           WHERE task_id = $1`,
         [row.task_id, workerId]
       );
-      await logEvent(row.task_id, "hermes", "STATE_CHANGE", from, "ASSIGNED", { worker: workerId }, client);
+      await logEvent(row.task_id, "hermes", "STATE_CHANGE", "QUEUED", "ASSIGNED", { worker: workerId }, client);
       claimed.push(rowToContract({ ...row, status: "ASSIGNED" }));
     }
     await client.query("COMMIT");

@@ -23,7 +23,23 @@ export const WORKFLOW_PIPELINES: Record<string, AgentName[]> = {
   // Example wiring of the PRD's canonical flow. Adjust the task_type key
   // (and the agents/order) to match how task_type values are actually used.
   research_to_outreach: ["gemma", "deepseek", "nova"],
+  // Sequenzy email outreach pipeline: research → extract leads → draft email → send
+  email_outreach: ["gemma", "deepseek", "nova"],
+  // bunny.net content pipeline: research → extract media → upload/publish
+  content_publish: ["gemma", "deepseek", "nova"],
 };
+
+/**
+ * Task types for external service integrations. These are single-worker task
+ * types (not pipelined by default) — they execute an external action and
+ * return the result. Prime still gates them before closing.
+ */
+export const SEQUENZY_SEND_EMAIL_TASK_TYPE = "sequenzy_send_email";
+export const SEQUENZY_TRIGGER_EVENT_TASK_TYPE = "sequenzy_trigger_event";
+export const SEQUENZY_MANAGE_SUBSCRIBER_TASK_TYPE = "sequenzy_manage_subscriber";
+export const BUNNY_UPLOAD_TASK_TYPE = "bunny_upload";
+export const BUNNY_PURGE_TASK_TYPE = "bunny_purge";
+export const BUNNY_VIDEO_TASK_TYPE = "bunny_video_push";
 
 /**
  * PRD §3 step 8 "Response Analysis - Nova": the task_type used for tasks

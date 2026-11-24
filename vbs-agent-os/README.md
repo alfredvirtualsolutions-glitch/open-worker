@@ -1,4 +1,4 @@
-# VBS Agent Operating System — Phase 1 (Core Operations)
+# VBS Agent Operating System — Phase 1 (Core Operations) + Phase 5 Slice
 
 Implements the PRD's Phase 1 scope: the shared task contract, persistent
 state, Hermes routing, the four specialist agent adapters (Gemma, DeepSeek,
@@ -18,11 +18,26 @@ just has Hermes spawn the next stage as a linked follow-up task
 stage's evidence/result forward. A `task_type` absent from that config
 behaves as a single worker + one Prime gate, same as before.
 
+## External service integrations (Phase 5 slice)
+
+Two external service integrations are wired up and ready to use:
+
+- **Sequenzy** (`src/services/sequenzy.ts`) — Nova handles: `sequenzy_send_email`,
+  `sequenzy_trigger_event`, `sequenzy_manage_subscriber`. Calls
+  `https://api.sequenzy.com/api/v1` with Bearer token.
+- **bunny.net** (`src/services/bunny.ts`) — DeepSeek handles: `bunny_upload`,
+  `bunny_purge`, `bunny_video_push`. Calls `https://api.bunny.net` and
+  `https://storage.bunnycdn.com` with `Access-Key` header.
+
+Both are **opt-in**: if the API key env var is missing, the adapter returns a
+structured error instead of crashing. Pipelined workflows: `email_outreach`
+(gemma→deepseek→nova), `content_publish` (gemma→deepseek→nova).
+
 ## Local development
 
 ```bash
 npm install
-cp .env.example .env   # fill in a real ANTHROPIC_API_KEY, DATABASE_URL, HERMES_ADMIN_TOKEN
+cp .env.example .env   # fill in ANTHROPIC_API_KEY, DATABASE_URL, HERMES_ADMIN_TOKEN, SEQUENZY_API_KEY, BUNNY_API_KEY
 npm run build
 npm run migrate
 npm run dev             # or: npm start (after build)
@@ -82,6 +97,8 @@ shared `HERMES_ADMIN_TOKEN` for an externally-reachable endpoint.
 
 Phase 3 (5-agent command-center dashboard, including the `PAUSE_*`/`CANCEL_TASK`
 kill-switch UI — the API for those already exists per PRD §7, just no UI yet),
-Phase 5 (autonomous external actions), and Phase 6 (per-client campaign config
-beyond the basic `client_configs` table) are out of scope for this delivery —
-see ADR-001's "Consequences" section and ADR-002 for the upgrade path.
+and Phase 6 (per-client campaign config beyond the basic `client_configs` table)
+are out of scope for this delivery — see ADR-001's "Consequences" section and
+ADR-002 for the upgrade path. Phase 5 is partially implemented via the
+Sequenzy and bunny.net integrations above; full autonomous external actions
+are still gated behind the Phase 1 acceptance checklist (PRD §9).
